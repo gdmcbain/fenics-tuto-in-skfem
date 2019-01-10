@@ -3,3 +3,5 @@ Translation into scikit-fem from FEniCS of
 
 Generating the mesh in the circular domain requires
 [dmsh](https://pypi.org/project/dmsh).
+
+![deflexion.png](./deflexion.png)
