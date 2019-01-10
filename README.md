@@ -1,2 +1,1 @@
-# fenics-tuto-in-skfem
-reproducing the examples from the FEniCS tutorial in scikit-fem
+reproducing the examples from [_Solving PDEs in Python—The FEniCS Tutorial Volume 1_](https://fenicsproject.org/pub/tutorial/html/ftut1.html) tutorial in [scikit-fem](https://github.com/kinnala/scikit-fem)
