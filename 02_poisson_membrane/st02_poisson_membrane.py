@@ -16,7 +16,7 @@ boundary = basis.get_dofs().all()
 def load(v, dv, w):
     beta = 8.
     R0 = .6
-    return 4 / np.exp(beta**2 * (w.x[0]**2 + (w.x[1] - R0)**2))
+    return 4 * v / np.exp(beta**2 * (w.x[0]**2 + (w.x[1] - R0)**2))
 
 A = asm(laplace, basis)
 b = asm(load, basis)
