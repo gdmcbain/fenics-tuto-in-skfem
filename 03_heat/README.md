@@ -10,4 +10,4 @@ This is much as in [‘Heat equation’](https://kinnala.github.io/scikit-fem-do
 
 For the moment, this is done without factorizing the evolution matrix
 as in the scikit-fem example which requires
-[scikit-sparse](https://github.com/scikit-sparse/scikit-sparse). (TODO)
+[scikit-sparse](https://github.com/scikit-sparse/scikit-sparse).
