@@ -7,7 +7,4 @@ This is much as in [‘Heat equation’](https://kinnala.github.io/scikit-fem-do
 * has evolving Dirichlet data
 * has volumetric heating
 * uses backward Euler rather than Crank–Nicolson
-
-For the moment, this is done without factorizing the evolution matrix
-as in the scikit-fem example which requires
-[scikit-sparse](https://github.com/scikit-sparse/scikit-sparse).
+* doesn't factorize the evolution matrix
