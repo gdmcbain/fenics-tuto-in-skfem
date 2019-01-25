@@ -108,3 +108,5 @@ venv.bak/
 # solutions
 *.h5
 *.xdmf
+
+ft*.py
