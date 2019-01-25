@@ -43,6 +43,7 @@ for i in range(num_steps + 1):
     mesh.plot(u, ax=ax, zlim=(0, 1))
     if t == 0.:
         fig.colorbar(ax.get_children()[0])
+        fig.savefig('initial.png')
     fig.show()
     pause(.01)
 
