@@ -34,4 +34,4 @@ V = InteriorBasis(mesh, ElementTriP1())
 u_D = lambdify((x, y), u.subs({R.x: x, R.y: y}))
 
 u = u_D(*mesh.p)
-mesh.save(str(output_dir.joinpath('dirichlet.xdmf')), u)
+mesh.plot(u).get_figure().savefig(str(output_dir.joinpath('initial.png')))
