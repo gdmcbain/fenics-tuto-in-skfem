@@ -62,7 +62,7 @@ def diffusion_matrix(u):
     return asm(diffusion_form, V, w=V.interpolate(u))
 
 dirichlet = apply(u_exact, mesh.p)    # P1 nodal interpolation
-mesh.plot(u).get_figure().savefig(str(output_dir.joinpath('exact.png')))
+mesh.plot(dirichlet).get_figure().savefig(str(output_dir.joinpath('exact.png')))
 
 
 def residual(u):
@@ -77,8 +77,8 @@ result = root(residual, u, method='krylov')
 
 if result.success:
     u = result.x
-    print('Success: residual =', np.linalg.norm(residual(u), np.inf))
-    print(' or nodally Linf:', np.linalg.norm(u - dirichlet, np.inf))
+    print('Success.  Residual =', np.linalg.norm(residual(u), np.inf))
+    print('Nodal Linf error =', np.linalg.norm(u - dirichlet, np.inf))
     mesh.plot(u).get_figure().savefig(str(output_dir.joinpath('solution.png')))
 else:
     print(result)
