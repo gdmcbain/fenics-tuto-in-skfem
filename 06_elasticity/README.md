@@ -8,3 +8,6 @@ Or
 [ex21](https://github.com/kinnala/scikit-fem/blob/master/docs/examples/ex21.py)
 which has MeshTet and ElementTetP1.
 
+![deformed.png](deformed.png)
+
+_Figure:—_ Deformed beam

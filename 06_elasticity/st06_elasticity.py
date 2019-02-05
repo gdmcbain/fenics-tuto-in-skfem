@@ -21,7 +21,6 @@ g = gamma
 mesh = MeshTet.init_tensor(np.linspace(0, L, 10 + 1),
                            np.linspace(0, W, 3 + 1),
                            np.linspace(0, W, 3 + 1))
-mesh.save('mesh.xdmf')
 
 basis = InteriorBasis(mesh, ElementVectorH1(ElementTetP1()))
 
