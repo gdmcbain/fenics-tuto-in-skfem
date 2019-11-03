@@ -18,7 +18,7 @@ u[boundary] = u_D[boundary]
 a = asm(laplace, V)
 L = -6.0 * asm(unit_load, V)
 
-u[mesh.interior_nodes()] = solve(*condense(a, L, u, D=boundary))
+u = solve(*condense(a, L, u, D=boundary))
 
 ax = mesh.plot(u)
 ax.get_figure().savefig('poisson.png')
