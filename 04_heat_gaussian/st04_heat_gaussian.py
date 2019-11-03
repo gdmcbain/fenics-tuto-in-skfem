@@ -50,7 +50,6 @@ for i in range(num_steps + 1):
     t += dt
     b = M @ u
 
-    u[boundary] = 0.
-    u[interior] = solve(*condense(A, b, u, D=boundary))
+    u = solve(*condense(A, b, D=boundary))
     
     mesh.save(str(output_dir.joinpath(f'solution{i:06d}.vtk')), u)
