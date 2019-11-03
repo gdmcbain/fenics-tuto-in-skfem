@@ -24,7 +24,7 @@ mesh = MeshTet.init_tensor(np.linspace(0, L, 10 + 1),
 
 basis = InteriorBasis(mesh, ElementVectorH1(ElementTetP1()))
 
-clamped = basis.get_dofs(lambda x, y, z: x==0.).all()
+clamped = basis.get_dofs(lambda x: x[0]==0.).all()
 free = basis.complement_dofs(clamped)
 
 K = asm(linear_elasticity(lambda_, mu), basis)
