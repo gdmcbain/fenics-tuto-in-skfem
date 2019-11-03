@@ -52,4 +52,5 @@ for i in range(num_steps + 1):
 
     u = solve(*condense(A, b, D=boundary))
     
-    mesh.save(str(output_dir.joinpath(f'solution{i:06d}.vtk')), u)
+    mesh.save(str(output_dir.joinpath(f'solution{i:06d}.vtk')),
+              {'temperature': u})
