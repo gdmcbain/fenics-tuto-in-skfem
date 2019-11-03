@@ -35,8 +35,7 @@ def load(v, dv, w):
 
 f = asm(load, basis)
 
-u = np.zeros(basis.N)
-u[free] = solve(*condense(K, f, u, I=free))
+u = solve(*condense(K, f, I=free))
 
 deformed = MeshTet(mesh.p + u[basis.nodal_dofs], mesh.t)
 deformed.save('deformed.xdmf')

@@ -26,8 +26,7 @@ def load(v, dv, w):
 A = asm(laplace, basis)
 b = asm(load, basis)
 
-w = np.zeros_like(b)
-w[basis.complement_dofs(boundary)] = solve(*condense(A, b, D=boundary))
+w = solve(*condense(A, b, D=boundary))
 
 mesh.save('w.xdmf', w)
 
