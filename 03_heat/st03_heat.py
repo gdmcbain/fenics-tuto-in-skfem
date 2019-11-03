@@ -50,8 +50,7 @@ for i in range(num_steps + 1):
     b = dt * f + M @ u
     
     u_D = dirichlet(t)
-    u[boundary] = u_D[boundary]
-    u[interior] = solve(*condense(A, b, u_D, D=boundary))
+    u = solve(*condense(A, b, u_D, D=boundary))
     error = np.linalg.norm(u - u_D)
     print('t = %.2f: error = %.3g' % (t, error))
     

@@ -26,10 +26,9 @@ def load(v, dv, w):
 A = asm(laplace, basis)
 b = asm(load, basis)
 
-w = np.zeros_like(b)
-w[basis.complement_dofs(boundary)] = solve(*condense(A, b, D=boundary))
+w = solve(*condense(A, b, D=boundary))
 
-mesh.save('w.xdmf', w)
+mesh.save('w.xdmf', {'deflexion': w})
 
 y = np.linspace(-1, 1, 103)[1:-1]
 yy = np.vstack([np.zeros_like(y), y])
