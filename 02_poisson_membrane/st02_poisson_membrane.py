@@ -28,7 +28,7 @@ b = asm(load, basis)
 
 w = solve(*condense(A, b, D=boundary))
 
-mesh.save('w.xdmf', w)
+mesh.save('w.xdmf', {'deflexion': w})
 
 y = np.linspace(-1, 1, 103)[1:-1]
 yy = np.vstack([np.zeros_like(y), y])
