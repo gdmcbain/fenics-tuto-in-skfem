@@ -20,3 +20,9 @@ The three steps are:
 # du / dt = grad (p - p_), u += du
 
 Then reset with u~_ = u~, p__ = p_, p_ = p.
+
+# Results
+
+![st07_navier_stokes_channel.png](st07_navier_stokes_channel.png)
+
+_Figure:—_ Velocity vectors and pressure field at νt/h² = 1.

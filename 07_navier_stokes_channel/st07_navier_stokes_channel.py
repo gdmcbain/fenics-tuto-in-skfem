@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from matplotlib.pyplot import subplots, pause
 import numpy as np
 
@@ -58,7 +60,7 @@ dirichlet = {'u': basis['u'].get_dofs(boundary['wall']).all(),
 inlet_pressure_dofs = basis['p'].get_dofs(boundary['inlet']).all()
 
 uv_, p_ = (np.zeros(basis[v].N) for v in element.keys())  # penultimate
-uv__, p__ = (np.zeros_like(v) for v in (uv_, p_))  # antepenultimate
+p__ = np.zeros_like(p_)  # antepenultimate
 
 K = M / dt + L['u']
 
@@ -91,7 +93,7 @@ while t < t_final:
     du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
     u = uv + du
 
-    uv_, uv__ = uv, uv_
+    uv_ = uv
     p_, p__ = p, p_
 
     # postprocessing
@@ -107,6 +109,8 @@ while t < t_final:
     fig.show()
     pause(.2)
 
+
+fig.savefig(Path(__file__).with_suffix('.png'))
 
 # References
 
