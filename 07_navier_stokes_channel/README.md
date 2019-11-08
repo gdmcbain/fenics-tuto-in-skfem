@@ -17,7 +17,7 @@ The three steps are:
 
 # lap (dp) = div u~ / dt, p += dp
 
-# du / dt = grad (p - p_), u += du
+# du / dt = grad (p - p_), u = u~ + du
 
 Then reset with u~_ = u~, p__ = p_, p_ = p.
 
