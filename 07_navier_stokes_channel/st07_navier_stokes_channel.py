@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from matplotlib.pyplot import subplots, pause
 import numpy as np
 
 import skfem
@@ -66,9 +65,6 @@ p__ = np.zeros_like(p_)  # antepenultimate
 
 K = M / dt + L['u']
 
-# fig, ax = subplots()
-# ax.axis('off')
-
 t = 0
 
 with meshio.XdmfTimeSeriesWriter('channel.xdmf') as writer:
@@ -115,17 +111,6 @@ with meshio.XdmfTimeSeriesWriter('channel.xdmf') as writer:
         print(min(u[::2]), '<= u <= ', max(u[::2]),
               '||v|| = ', np.linalg.norm(u[1::2]))
 
-        # ax.cla()
-        # ax.axis('off')
-        # mesh.plot(p, ax=ax)
-        # fig.suptitle(
-        #     r'step plane Poiseuille flow at $\nu t / h^2$ =' + f'{t:.2f}')
-        # ax.quiver(*mesh.p, *u[basis['u'].nodal_dofs], scale=1e1)
-        # fig.show()
-        # pause(.2)
-
-
-# fig.savefig(Path(__file__).with_suffix('.png'))
 
 # References
 
