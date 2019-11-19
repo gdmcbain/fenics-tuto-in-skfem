@@ -7,6 +7,8 @@ import skfem
 from skfem.models.poisson import vector_laplace, laplace
 from skfem.models.general import divergence
 
+import meshio
+
 
 @skfem.bilinear_form
 def vector_mass(u, du, v, dv, w):
@@ -64,53 +66,66 @@ p__ = np.zeros_like(p_)  # antepenultimate
 
 K = M / dt + L['u']
 
-fig, ax = subplots()
-ax.axis('off')
+# fig, ax = subplots()
+# ax.axis('off')
 
 t = 0
-while t < t_final:
 
-    t += dt
+with meshio.XdmfTimeSeriesWriter('channel.xdmf') as writer:
 
-    # Step 1: Momentum prediction (Ern & Guermond 2002, eq. 7.40, p. 274)
+    writer.write_points_cells(mesh.p.T, {'triangle': mesh.t.T})
 
-    uv = skfem.solve(*skfem.condense(K, (M / dt) @ uv_ - P @ (2 * p_ - p__),
-                                     np.zeros_like(uv_), D=dirichlet['u']))
+    while t < t_final:
 
-    # Step 2: Projection (Ern & Guermond 2002, eq. 7.41, p. 274)
+        t += dt
 
-    dp = np.zeros(basis['p'].N)
-    dp[inlet_pressure_dofs] = p_inlet - p_[inlet_pressure_dofs]
+        # Step 1: Momentum prediction (Ern & Guermond 2002, eq. 7.40, p. 274)
 
-    dp = skfem.solve(*skfem.condense(L['p'], B @ uv,
-                                     dp, D=dirichlet['p']))
+        uv = skfem.solve(*skfem.condense(
+            K, (M / dt) @ uv_ - P @ (2 * p_ - p__),
+            np.zeros_like(uv_), D=dirichlet['u']))
 
-    # Step 3: Recover pressure and velocity (E. & G. 2002, p. 274)
+        # Step 2: Projection (Ern & Guermond 2002, eq. 7.41, p. 274)
 
-    p = p_ + dp
-    print(min(p), '<= p <= ', max(p))
+        dp = np.zeros(basis['p'].N)
+        dp[inlet_pressure_dofs] = p_inlet - p_[inlet_pressure_dofs]
 
-    du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
-    u = uv + du
+        dp = skfem.solve(*skfem.condense(L['p'], B @ uv,
+                                         dp, D=dirichlet['p']))
 
-    uv_ = uv
-    p_, p__ = p, p_
+        # Step 3: Recover pressure and velocity (E. & G. 2002, p. 274)
 
-    # postprocessing
-    
-    print(min(u[::2]), '<= u <= ', max(u[::2]),
-          '||v|| = ', np.linalg.norm(u[1::2]))
+        p = p_ + dp
+        print(min(p), '<= p <= ', max(p))
 
-    ax.cla()
-    ax.axis('off')
-    mesh.plot(p, ax=ax)
-    fig.suptitle(r'step plane Poiseuille flow at $\nu t / h^2$ =' + f'{t:.2f}')
-    ax.quiver(*mesh.p, *u[basis['u'].nodal_dofs], scale=1e1)
-    fig.show()
-    pause(.2)
+        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
+        u = uv + du
+
+        uv_ = uv
+        p_, p__ = p, p_
+
+        # postprocessing
+        writer.write_data(
+            t,
+            point_data={
+                'pressure': p,
+                'velocity': np.pad(u[basis['u'].nodal_dofs].T,
+                                   ((0, 0), (0, 1)), 'constant')})
+
+        print(min(u[::2]), '<= u <= ', max(u[::2]),
+              '||v|| = ', np.linalg.norm(u[1::2]))
+
+        # ax.cla()
+        # ax.axis('off')
+        # mesh.plot(p, ax=ax)
+        # fig.suptitle(
+        #     r'step plane Poiseuille flow at $\nu t / h^2$ =' + f'{t:.2f}')
+        # ax.quiver(*mesh.p, *u[basis['u'].nodal_dofs], scale=1e1)
+        # fig.show()
+        # pause(.2)
 
 
-fig.savefig(Path(__file__).with_suffix('.png'))
+# fig.savefig(Path(__file__).with_suffix('.png'))
 
 # References
 
