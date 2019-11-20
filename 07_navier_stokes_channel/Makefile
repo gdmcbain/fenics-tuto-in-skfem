@@ -1,6 +1,7 @@
-%.png: %.py
+%.xdmf: %.py
 	python ${PYFLAGS} $<
-all: st07_navier_stokes_channel.png
+all: st07_navier_stokes_channel.xdmf
 clean:
-	${RM} *.png *~
+	${RM} *.xdmf *.h5 *.png
+	${RM} *~
 .PHONY: all clean

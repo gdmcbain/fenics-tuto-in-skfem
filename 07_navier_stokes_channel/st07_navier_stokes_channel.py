@@ -23,7 +23,6 @@ p_inlet = 8.
 
 mesh = skfem.MeshTri()
 mesh.refine(3)
-mesh.save('mesh.xdmf')
 
 boundary = {
     'inlet':  mesh.facets_satisfying(lambda x: x[0] == 0),
@@ -67,7 +66,8 @@ K = M / dt + L['u']
 
 t = 0
 
-with meshio.XdmfTimeSeriesWriter('channel.xdmf') as writer:
+with meshio.XdmfTimeSeriesWriter(
+        Path(__file__).with_suffix('.xdmf').name) as writer:
 
     writer.write_points_cells(mesh.p.T, {'triangle': mesh.t.T})
 
