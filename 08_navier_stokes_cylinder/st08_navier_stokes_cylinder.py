@@ -54,9 +54,9 @@ P = B.T + skfem.asm(port_pressure,
                       for v in ['p', 'u']))
 
 t_final = 5.
-dt = t_final / 5000
+dt = .001
 
-mu = 1.
+mu = .1
 rho = 1.
 
 K = rho * M / dt + mu * L['u']
@@ -85,7 +85,10 @@ uv0[inlet_dofs] = (6 * monic(basis['u'].doflocs[1, inlet_dofs])
 #     writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
 
 fig, ax = plt.subplots(2)
+ax[0].set_title('velocity')
+ax[1].set_title('pressure')
 for axis in ax:
+    axis.axis('off')
     axis.set_aspect(1.)
 mesh.plot(np.linalg.norm(uv_[basis['u'].nodal_dofs], axis=0),
           ax=ax[0], smooth=True)
@@ -124,7 +127,7 @@ while t < t_final:
     print(t, min(u[::2]), '<= u <= ', max(u[::2]),
           ',', min(p), '<= p <=', max(p))
 
-    fig.suptitle(f't = {t:4f}')
+    fig.suptitle(f't = {t:.3f}')
     mesh.plot(np.linalg.norm(uv[basis['u'].nodal_dofs], axis=0),
               ax=ax[0], smooth=True)
     mesh.plot(p, ax=ax[1], smooth=True)
