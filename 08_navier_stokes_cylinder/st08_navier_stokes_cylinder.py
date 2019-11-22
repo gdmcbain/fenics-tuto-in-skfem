@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from matplotlib.pyplot import pause, subplots
+import matplotlib.pyplot as plt
 import numpy as np
 
 from pygmsh import generate_mesh
@@ -21,6 +21,7 @@ def vector_mass(u, du, v, dv, w):
 
 @skfem.bilinear_form
 def port_pressure(u, du, v, dv, w):
+    """v is the P2 velocity test-function, u a P1 pressure"""
     return sum(v * (u * w.n))
 
 
@@ -47,93 +48,84 @@ M = skfem.asm(vector_mass, basis['u'])
 L = {'u': skfem.asm(vector_laplace, basis['u']),
      'p': skfem.asm(laplace, basis['p'])}
 B = -skfem.asm(divergence, basis['u'], basis['p'])
-port_facets = np.concatenate([mesh.boundaries['inlet'],
-                              mesh.boundaries['outlet']])
 P = B.T + skfem.asm(port_pressure,
-                    *(skfem.FacetBasis(mesh, element[v],
-                                       facets=port_facets, intorder=3)
+                    *(skfem.FacetBasis(mesh, element[v], intorder=3,
+                                       facets=mesh.boundaries['outlet'])
                       for v in ['p', 'u']))
 
 t_final = 5.
 dt = t_final / 5000
 
-mu = .001
+mu = 1.
 rho = 1.
 
-K = M / dt + mu * L['u']
+K = rho * M / dt + mu * L['u']
 
 uv_, p_ = (np.zeros(basis[v].N) for v in element.keys())  # penultimate
 p__ = np.zeros_like(p_)  # antepenultimate
 
-dirichlet = {'u': np.setdiff1d(
-    basis['u'].get_dofs().all(),
-    basis['u'].get_dofs(mesh.boundaries['outlet']).all()),
-             'p': basis['p'].get_dofs(
-                 np.concatenate([mesh.boundaries['inlet'],
-                                 mesh.boundaries['outlet']]))}
-inlet_pressure_dofs = basis['p'].get_dofs(mesh.boundaries['inlet']).all()
-p_inlet = 1.                    # XXX
-# uv0 = np.zeros(basis['u'].N)
-# inlet_dofs = basis['u'].get_dofs(mesh.boundaries['inlet']).all('u^1')
-# inlet_y_lim = [p.x[1] for p in channel.lines[3].points[::-1]]
-# monic = np.polynomial.polynomial.Polynomial.fromroots(inlet_y_lim)
-# uv0[inlet_dofs] = (monic(basis['u'].doflocs[1, inlet_dofs]) /
-#                    monic(np.mean(inlet_y_lim)))
+dirichlet = {
+    'u': np.setdiff1d(basis['u'].get_dofs().all(),
+                      basis['u'].get_dofs(mesh.boundaries['outlet']).all()),
+    'p': basis['p'].get_dofs(mesh.boundaries['outlet']).all()}
+
+uv0 = np.zeros(basis['u'].N)
+inlet_dofs = basis['u'].get_dofs(mesh.boundaries['inlet']).all('u^1')
+inlet_y_lim = [p.x[1] for p in channel.lines[3].points[::-1]]
+monic = np.polynomial.polynomial.Polynomial.fromroots(inlet_y_lim)
+uv0[inlet_dofs] = (6 * monic(basis['u'].doflocs[1, inlet_dofs])
+                   / inlet_y_lim[1]**2)
 
 
-def embed(xy: np.ndarray) -> np.ndarray:
-    return np.pad(xy, ((0, 0), (0, 1)), 'constant')
+# 2 embed(xy: np.ndarray) -> np.ndarray:
+#     return np.pad(xy, ((0, 0), (0, 1)), 'constant')
 
-with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
+# with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
-    writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
+#     writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
 
-    fig, ax = subplots()
-    ax.axis('off')
-    
-    t = 0.
-    while t < t_final:
-        t += dt
+fig, ax = plt.subplots(2)
+for axis in ax:
+    axis.set_aspect(1.)
+mesh.plot(np.linalg.norm(uv_[basis['u'].nodal_dofs], axis=0),
+          ax=ax[0], smooth=True)
+mesh.plot(p_, ax=ax[1], smooth=True)
+fig.suptitle('t = 0.')
 
-        # Step 1: momentum prediction
+t = 0.
+while t < t_final:
+    t += dt
 
-        uv = skfem.solve(*skfem.condense(
-            K, (M / dt) @ uv_ - P @ (2 * p_ - p__),
-            np.zeros_like(uv_), D=dirichlet['u']))
+    # Step 1: momentum prediction
 
-        # Step 2: pressure correction
+    uv = skfem.solve(*skfem.condense(K, (M / dt) @ uv_ - P @ (2 * p_ - p__),
+                                     uv0, D=dirichlet['u']))
 
-        dp = np.zeros(basis['p'].N)
-        dp[inlet_pressure_dofs] = p_inlet - p_[inlet_pressure_dofs]
-        dp = skfem.solve(*skfem.condense(L['p'], B @ uv, dp,
-                                         D=dirichlet['p']))
+    # Step 2: pressure correction
 
+    dp = skfem.solve(*skfem.condense(L['p'], (B / dt) @ uv, D=dirichlet['p']))
 
-        # Step 3: velocity correction
+    # Step 3: velocity correction
 
-        p = p_ + dp
-        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
-        u = uv + du
+    p = p_ + dp
+    du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
+    u = uv + du
 
-        uv_ = uv
-        p_, p__ = p, p_
+    uv_ = uv
+    p_, p__ = p, p_
 
-        # postprocessing
-        
-        writer.write_data(
-            t,
-            point_data={'pressure': p,
-                        'velocity': embed(uv[basis['u'].nodal_dofs].T)})
+    # postprocessing
 
-        print(t, min(u[::2]), '<= u <= ', max(u[::2]),
-              ',', min(p), '<= p <=', max(p))
+    # writer.write_data(
+    #     t,
+    #     point_data={'pressure': p,
+    #                 'velocity': embed(uv[basis['u'].nodal_dofs].T)})
 
-        ax.cla()
-        fig.suptitle(f't = {t:4f}')
-        mesh.plot(p, ax=ax)
-        ax.set_aspect(1.)
-        ax.set_axis_off()
-        if t == dt:
-            fig.colorbar(ax.get_children()[0])
-        fig.show()
-        pause(.5)
+    print(t, min(u[::2]), '<= u <= ', max(u[::2]),
+          ',', min(p), '<= p <=', max(p))
+
+    fig.suptitle(f't = {t:4f}')
+    mesh.plot(np.linalg.norm(uv[basis['u'].nodal_dofs], axis=0),
+              ax=ax[0], smooth=True)
+    mesh.plot(p, ax=ax[1], smooth=True)
+    plt.pause(.1)
