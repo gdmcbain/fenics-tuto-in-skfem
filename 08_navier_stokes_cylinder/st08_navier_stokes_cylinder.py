@@ -71,7 +71,7 @@ P = B.T + skfem.asm(port_pressure,
                                        facets=mesh.boundaries['outlet'])
                       for v in ['p', 'u']))
 
-t_final = .01
+t_final = 5.
 dt = .001
 
 nu = .001
