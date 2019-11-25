@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from pygmsh import generate_mesh
@@ -71,7 +70,7 @@ P = B.T + skfem.asm(port_pressure,
                                        facets=mesh.boundaries['outlet'])
                       for v in ['p', 'u']))
 
-t_final = 1.
+t_final = 5.
 dt = .001
 
 nu = .001
@@ -96,24 +95,13 @@ uv0[inlet_dofs] = (-6 * monic(basis['u'].doflocs[1, inlet_dofs])
                    / inlet_y_lim[1]**2)
 
 
-# fig, ax = plt.subplots(2)
-# ax[0].set_title('velocity')
-# ax[1].set_title('pressure')
-# for axis in ax:
-#     axis.axis('off')
-#     axis.set_aspect(1.)
-# mesh.plot(np.linalg.norm(uv_[basis['u'].nodal_dofs], axis=0),
-#           ax=ax[0], smooth=True)
-# mesh.plot(p_, ax=ax[1], smooth=True)
-# fig.suptitle('t = 0.')
-
 def embed(xy: np.ndarray) -> np.ndarray:
     return np.pad(xy, ((0, 0), (0, 1)), 'constant')
+
 
 with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
     writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
-
 
     t = 0.
     while t < t_final:
@@ -123,13 +111,13 @@ with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
         uv = skfem.solve(*skfem.condense(
             K_lhs, K_rhs @ uv_ - P @ (2 * p_ - p__)
-            -skfem.asm(acceleration, basis['u'],
-                       w=basis['u'].interpolate(u)),
+            - skfem.asm(acceleration, basis['u'], w=basis['u'].interpolate(u)),
             uv0, D=dirichlet['u']))
 
         # Step 2: pressure correction
 
-        dp = skfem.solve(*skfem.condense(L['p'], (B / dt) @ uv, D=dirichlet['p']))
+        dp = skfem.solve(*skfem.condense(L['p'], (B / dt) @ uv,
+                                         D=dirichlet['p']))
 
         # Step 3: velocity correction
 
@@ -148,9 +136,3 @@ with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
                         'velocity': embed(uv[basis['u'].nodal_dofs].T)})
 
         print(f't = {t}, max u = ', u[basis['u'].nodal_dofs].max())
-
-        # fig.suptitle(f't = {t:.3f}')
-        # mesh.plot(np.linalg.norm(uv[basis['u'].nodal_dofs], axis=0),
-        #           ax=ax[0], smooth=True)
-        # mesh.plot(p, ax=ax[1], smooth=True)
-        # plt.pause(.1)
