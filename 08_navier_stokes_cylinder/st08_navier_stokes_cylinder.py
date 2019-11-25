@@ -71,10 +71,10 @@ P = B.T + skfem.asm(port_pressure,
                                        facets=mesh.boundaries['outlet'])
                       for v in ['p', 'u']))
 
-t_final = 5.
+t_final = .01
 dt = .001
 
-nu = .01
+nu = .001
 
 K = M / dt + nu * L['u']
 
@@ -95,61 +95,61 @@ uv0[inlet_dofs] = (-6 * monic(basis['u'].doflocs[1, inlet_dofs])
                    / inlet_y_lim[1]**2)
 
 
-# 2 embed(xy: np.ndarray) -> np.ndarray:
-#     return np.pad(xy, ((0, 0), (0, 1)), 'constant')
+# fig, ax = plt.subplots(2)
+# ax[0].set_title('velocity')
+# ax[1].set_title('pressure')
+# for axis in ax:
+#     axis.axis('off')
+#     axis.set_aspect(1.)
+# mesh.plot(np.linalg.norm(uv_[basis['u'].nodal_dofs], axis=0),
+#           ax=ax[0], smooth=True)
+# mesh.plot(p_, ax=ax[1], smooth=True)
+# fig.suptitle('t = 0.')
 
-# with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
+def embed(xy: np.ndarray) -> np.ndarray:
+    return np.pad(xy, ((0, 0), (0, 1)), 'constant')
 
-#     writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
+with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
-fig, ax = plt.subplots(2)
-ax[0].set_title('velocity')
-ax[1].set_title('pressure')
-for axis in ax:
-    axis.axis('off')
-    axis.set_aspect(1.)
-mesh.plot(np.linalg.norm(uv_[basis['u'].nodal_dofs], axis=0),
-          ax=ax[0], smooth=True)
-mesh.plot(p_, ax=ax[1], smooth=True)
-fig.suptitle('t = 0.')
+    writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
 
-t = 0.
-while t < t_final:
-    t += dt
 
-    # Step 1: momentum prediction
+    t = 0.
+    while t < t_final:
+        t += dt
 
-    uv = skfem.solve(*skfem.condense(
-        K, (M / dt) @ uv_ - P @ (2 * p_ - p__)
-        -skfem.asm(acceleration, basis['u'],
-                   w=basis['u'].interpolate(u)),
-        uv0, D=dirichlet['u']))
+        # Step 1: momentum prediction
 
-    # Step 2: pressure correction
+        uv = skfem.solve(*skfem.condense(
+            K, (M / dt) @ uv_ - P @ (2 * p_ - p__)
+            -skfem.asm(acceleration, basis['u'],
+                       w=basis['u'].interpolate(u)),
+            uv0, D=dirichlet['u']))
 
-    dp = skfem.solve(*skfem.condense(L['p'], (B / dt) @ uv, D=dirichlet['p']))
+        # Step 2: pressure correction
 
-    # Step 3: velocity correction
+        dp = skfem.solve(*skfem.condense(L['p'], (B / dt) @ uv, D=dirichlet['p']))
 
-    p = p_ + dp
-    du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
-    u = uv + du
+        # Step 3: velocity correction
 
-    uv_ = uv
-    p_, p__ = p, p_
+        p = p_ + dp
+        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
+        u = uv + du
 
-    # postprocessing
+        uv_ = uv
+        p_, p__ = p, p_
 
-    # writer.write_data(
-    #     t,
-    #     point_data={'pressure': p,
-    #                 'velocity': embed(uv[basis['u'].nodal_dofs].T)})
+        # postprocessing
 
-    print(t, min(u[::2]), '<= u <= ', max(u[::2]),
-          ',', min(p), '<= p <=', max(p))
+        writer.write_data(
+            t,
+            point_data={'pressure': p,
+                        'velocity': embed(uv[basis['u'].nodal_dofs].T)})
 
-    fig.suptitle(f't = {t:.3f}')
-    mesh.plot(np.linalg.norm(uv[basis['u'].nodal_dofs], axis=0),
-              ax=ax[0], smooth=True)
-    mesh.plot(p, ax=ax[1], smooth=True)
-    plt.pause(.1)
+        print(f't = {t}, max u = ', u[basis['u'].nodal_dofs].max())
+
+        # fig.suptitle(f't = {t:.3f}')
+        # mesh.plot(np.linalg.norm(uv[basis['u'].nodal_dofs], axis=0),
+        #           ax=ax[0], smooth=True)
+        # mesh.plot(p, ax=ax[1], smooth=True)
+        # plt.pause(.1)
