@@ -76,7 +76,8 @@ dt = .001
 
 nu = .001
 
-K = M / dt + nu * L['u'] / 2
+K_lhs = M / dt + nu * L['u'] / 2
+K_rhs = M / dt - nu * L['u'] / 2
 
 uv_, p_ = (np.zeros(basis[v].N) for v in element.keys())  # penultimate
 p__ = np.zeros_like(p_)  # antepenultimate
@@ -121,7 +122,7 @@ with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
         # Step 1: momentum prediction
 
         uv = skfem.solve(*skfem.condense(
-            K, (M / dt) @ uv_ + nu * L['u'] @ uv_ / 2 - P @ (2 * p_ - p__)
+            K_lhs, K_rhs @ uv_ - P @ (2 * p_ - p__)
             -skfem.asm(acceleration, basis['u'],
                        w=basis['u'].interpolate(u)),
             uv0, D=dirichlet['u']))
