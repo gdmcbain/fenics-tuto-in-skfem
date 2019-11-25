@@ -19,6 +19,24 @@ def vector_mass(u, du, v, dv, w):
     return sum(v * u)
 
 
+@skfem.linear_form
+def acceleration(v, dv, w):
+    """Compute the vector (v, u . grad u) for given velocity u
+
+    passed in via w after having been interpolated onto its quadrature
+    points.
+
+    In Cartesian tensorial indicial notation, the integrand is
+
+    .. math::
+
+        u_j u_{i,j} v_i.
+
+    """
+    u, du = w.w, w.dw
+    return sum(np.einsum('j...,ij...->i...', u, du) * v)
+
+
 @skfem.bilinear_form
 def port_pressure(u, du, v, dv, w):
     """v is the P2 velocity test-function, u a P1 pressure"""
@@ -56,13 +74,13 @@ P = B.T + skfem.asm(port_pressure,
 t_final = 5.
 dt = .001
 
-mu = .1
-rho = 1.
+nu = .01
 
-K = rho * M / dt + mu * L['u']
+K = M / dt + nu * L['u']
 
 uv_, p_ = (np.zeros(basis[v].N) for v in element.keys())  # penultimate
 p__ = np.zeros_like(p_)  # antepenultimate
+u = np.zeros_like(uv_)
 
 dirichlet = {
     'u': np.setdiff1d(basis['u'].get_dofs().all(),
@@ -101,8 +119,11 @@ while t < t_final:
 
     # Step 1: momentum prediction
 
-    uv = skfem.solve(*skfem.condense(K, (M / dt) @ uv_ - P @ (2 * p_ - p__),
-                                     uv0, D=dirichlet['u']))
+    uv = skfem.solve(*skfem.condense(
+        K, (M / dt) @ uv_ - P @ (2 * p_ - p__)
+        -skfem.asm(acceleration, basis['u'],
+                   w=basis['u'].interpolate(u)),
+        uv0, D=dirichlet['u']))
 
     # Step 2: pressure correction
 
