@@ -6,7 +6,7 @@ import skfem
 from skfem.models.poisson import vector_laplace, laplace
 from skfem.models.general import divergence
 
-import meshio
+from meshio.xdmf import TimeSeriesWriter
 
 
 @skfem.bilinear_form
@@ -67,7 +67,7 @@ K = M / dt + L['u']
 
 t = 0
 
-with meshio.XdmfTimeSeriesWriter('channel.xdmf') as writer:
+with TimeSeriesWriter('channel.xdmf') as writer:
 
     writer.write_points_cells(mesh.p.T, {'triangle': mesh.t.T})
 
