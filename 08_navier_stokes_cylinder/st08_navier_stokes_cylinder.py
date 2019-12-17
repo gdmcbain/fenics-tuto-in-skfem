@@ -12,6 +12,8 @@ from skfem.importers.meshio import from_meshio
 from skfem.models.general import divergence
 from skfem.models.poisson import laplace, vector_laplace
 
+import pyamgcl
+
 
 @skfem.bilinear_form
 def vector_mass(u, du, v, dv, w):
@@ -99,6 +101,16 @@ def embed(xy: np.ndarray) -> np.ndarray:
     return np.pad(xy, ((0, 0), (0, 1)), 'constant')
 
 
+solvers = [pyamgcl.solver(pyamgcl.amg(skfem.condense(K_lhs,
+                                                     D=dirichlet['u'],
+                                                     expand=False))),
+           pyamgcl.solver(pyamgcl.amg(skfem.condense(L['p'],
+                                                     D=dirichlet['p'],
+                                                     expand=False))),
+           pyamgcl.solver(pyamgcl.amg(skfem.condense(M / dt,
+                                                     D=dirichlet['u'],
+                                                     expand=False)))]
+
 with TimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
     writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
@@ -112,17 +124,20 @@ with TimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
         uv = skfem.solve(*skfem.condense(
             K_lhs, K_rhs @ uv_ - P @ (2 * p_ - p__)
             - skfem.asm(acceleration, basis['u'], w=basis['u'].interpolate(u)),
-            uv0, D=dirichlet['u']))
+            uv0, D=dirichlet['u']),
+                         solver=solvers[0])
 
         # Step 2: pressure correction
 
         dp = skfem.solve(*skfem.condense(L['p'], (B / dt) @ uv,
-                                         D=dirichlet['p']))
+                                         D=dirichlet['p']),
+                         solver=solvers[1])
 
         # Step 3: velocity correction
 
         p = p_ + dp
-        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
+        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']),
+                         solver=solvers[2])
         u = uv + du
 
         uv_ = uv
