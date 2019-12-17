@@ -143,4 +143,3 @@ for n in range(num_steps):
     p_n.assign(p_)
 
     print(f't = {t}, max u = ', u_.compute_vertex_values().max())
-
