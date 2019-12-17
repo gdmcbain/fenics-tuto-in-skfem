@@ -1,0 +1,8 @@
+rule all:
+     input: "st08_navier_stokes_cylinder.xdmf"
+rule run:
+     output: "{job}.xdmf", "{job}.h5"
+     input: "{job}.py"
+     shell: "python {input}"
+rule clean:
+     shell: "rm -f *~ *.xdmf *.h5 *.png"
