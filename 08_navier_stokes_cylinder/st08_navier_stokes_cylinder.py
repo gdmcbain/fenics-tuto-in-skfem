@@ -5,7 +5,7 @@ import numpy as np
 from pygmsh import generate_mesh
 from pygmsh.built_in import Geometry
 
-from meshio import XdmfTimeSeriesWriter
+from meshio.xdmf import TimeSeriesWriter
 
 import skfem
 from skfem.importers.meshio import from_meshio
@@ -99,7 +99,7 @@ def embed(xy: np.ndarray) -> np.ndarray:
     return np.pad(xy, ((0, 0), (0, 1)), 'constant')
 
 
-with XdmfTimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
+with TimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
     writer.write_points_cells(embed(mesh.p.T), {'triangle': mesh.t.T})
 
