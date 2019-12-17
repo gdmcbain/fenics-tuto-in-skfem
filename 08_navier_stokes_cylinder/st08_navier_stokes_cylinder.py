@@ -103,13 +103,19 @@ def embed(xy: np.ndarray) -> np.ndarray:
 
 solvers = [pyamgcl.solver(pyamgcl.amg(skfem.condense(K_lhs,
                                                      D=dirichlet['u'],
-                                                     expand=False))),
+                                                     expand=False),
+                                      {'coarsening.type': 'aggregation',
+                                       'relax.type': 'ilu0'}),
+                          {'type': 'cg'}),
            pyamgcl.solver(pyamgcl.amg(skfem.condense(L['p'],
                                                      D=dirichlet['p'],
-                                                     expand=False))),
+                                                     expand=False)),
+                          {'type': 'cg'}),
            pyamgcl.solver(pyamgcl.amg(skfem.condense(M / dt,
                                                      D=dirichlet['u'],
-                                                     expand=False)))]
+                                                     expand=False),
+                                      {'relax.type': 'gauss_seidel'}),
+                          {'type': 'cg'})]
 
 with TimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
