@@ -19,56 +19,58 @@ def port_pressure(u, v, w):
     return sum(v * (u * w.n))
 
 
-p_inlet = 8.
+p_inlet = 8.0
 
 mesh = skfem.MeshTri()
 mesh.refine(3)
 
 boundary = {
-    'inlet':  mesh.facets_satisfying(lambda x: x[0] == 0),
-    'outlet': mesh.facets_satisfying(lambda x: x[0] == 1),
-    'wall':  mesh.facets_satisfying(lambda x: np.logical_or(x[1] == 0,
-                                                            x[1] == 1)),
+    "inlet": mesh.facets_satisfying(lambda x: x[0] == 0),
+    "outlet": mesh.facets_satisfying(lambda x: x[0] == 1),
+    "wall": mesh.facets_satisfying(lambda x: np.logical_or(x[1] == 0, x[1] == 1)),
 }
-boundary['ports'] = np.concatenate([boundary['inlet'],
-                                    boundary['outlet']])
+boundary["ports"] = np.concatenate([boundary["inlet"], boundary["outlet"]])
 
-element = {'u': skfem.ElementVectorH1(skfem.ElementTriP2()),
-           'p': skfem.ElementTriP1()}
-basis = {**{v: skfem.InteriorBasis(mesh, e, intorder=4)
-            for v, e in element.items()},
-         **{label: skfem.FacetBasis(mesh, element['u'],
-                                    facets=boundary[label])
-            for label in ['inlet', 'outlet']}}
+element = {"u": skfem.ElementVectorH1(skfem.ElementTriP2()), "p": skfem.ElementTriP1()}
+basis = {
+    **{v: skfem.InteriorBasis(mesh, e, intorder=4) for v, e in element.items()},
+    **{
+        label: skfem.FacetBasis(mesh, element["u"], facets=boundary[label])
+        for label in ["inlet", "outlet"]
+    },
+}
 
 
-M = skfem.asm(vector_mass, basis['u'])
-L = {'u': skfem.asm(vector_laplace, basis['u']),
-     'p': skfem.asm(laplace, basis['p'])}
-B = -skfem.asm(divergence, basis['u'], basis['p'])
-P = B.T + skfem.asm(port_pressure,
-                    *(skfem.FacetBasis(mesh, element[v],
-                                       facets=boundary['ports'], intorder=3)
-                      for v in ['p', 'u']))
+M = skfem.asm(vector_mass, basis["u"])
+L = {"u": skfem.asm(vector_laplace, basis["u"]), "p": skfem.asm(laplace, basis["p"])}
+B = -skfem.asm(divergence, basis["u"], basis["p"])
+P = B.T + skfem.asm(
+    port_pressure,
+    *(
+        skfem.FacetBasis(mesh, element[v], facets=boundary["ports"], intorder=3)
+        for v in ["p", "u"]
+    )
+)
 
-t_final = 1.
-dt = .05
+t_final = 1.0
+dt = 0.05
 
-dirichlet = {'u': basis['u'].get_dofs(boundary['wall']).all(),
-             'p': np.concatenate([
-                 basis['p'].get_dofs(boundary['ports']).all()])}
-inlet_pressure_dofs = basis['p'].get_dofs(boundary['inlet']).all()
+dirichlet = {
+    "u": basis["u"].get_dofs(boundary["wall"]).all(),
+    "p": np.concatenate([basis["p"].get_dofs(boundary["ports"]).all()]),
+}
+inlet_pressure_dofs = basis["p"].get_dofs(boundary["inlet"]).all()
 
 uv_, p_ = (np.zeros(basis[v].N) for v in element.keys())  # penultimate
 p__ = np.zeros_like(p_)  # antepenultimate
 
-K = M / dt + L['u']
+K = M / dt + L["u"]
 
 t = 0
 
-with TimeSeriesWriter('channel.xdmf') as writer:
+with TimeSeriesWriter("channel.xdmf") as writer:
 
-    writer.write_points_cells(mesh.p.T, {'triangle': mesh.t.T})
+    writer.write_points_cells(mesh.p.T, {"triangle": mesh.t.T})
 
     while t < t_final:
 
@@ -76,24 +78,28 @@ with TimeSeriesWriter('channel.xdmf') as writer:
 
         # Step 1: Momentum prediction (Ern & Guermond 2002, eq. 7.40, p. 274)
 
-        uv = skfem.solve(*skfem.condense(
-            K, (M / dt) @ uv_ - P @ (2 * p_ - p__),
-            np.zeros_like(uv_), D=dirichlet['u']))
+        uv = skfem.solve(
+            *skfem.condense(
+                K,
+                (M / dt) @ uv_ - P @ (2 * p_ - p__),
+                np.zeros_like(uv_),
+                D=dirichlet["u"],
+            )
+        )
 
         # Step 2: Projection (Ern & Guermond 2002, eq. 7.41, p. 274)
 
-        dp = np.zeros(basis['p'].N)
+        dp = np.zeros(basis["p"].N)
         dp[inlet_pressure_dofs] = p_inlet - p_[inlet_pressure_dofs]
 
-        dp = skfem.solve(*skfem.condense(L['p'], B @ uv,
-                                         dp, D=dirichlet['p']))
+        dp = skfem.solve(*skfem.condense(L["p"], B @ uv, dp, D=dirichlet["p"]))
 
         # Step 3: Recover pressure and velocity (E. & G. 2002, p. 274)
 
         p = p_ + dp
-        print(min(p), '<= p <= ', max(p))
+        print(min(p), "<= p <= ", max(p))
 
-        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet['u']))
+        du = skfem.solve(*skfem.condense(M / dt, -P @ dp, D=dirichlet["u"]))
         u = uv + du
 
         uv_ = uv
@@ -103,12 +109,14 @@ with TimeSeriesWriter('channel.xdmf') as writer:
         writer.write_data(
             t,
             point_data={
-                'pressure': p,
-                'velocity': np.pad(u[basis['u'].nodal_dofs].T,
-                                   ((0, 0), (0, 1)), 'constant')})
+                "pressure": p,
+                "velocity": np.pad(
+                    u[basis["u"].nodal_dofs].T, ((0, 0), (0, 1)), "constant"
+                ),
+            },
+        )
 
-        print(min(u[::2]), '<= u <= ', max(u[::2]),
-              '||v|| = ', np.linalg.norm(u[1::2]))
+        print(min(u[::2]), "<= u <= ", max(u[::2]), "||v|| = ", np.linalg.norm(u[1::2]))
 
 
 # References
