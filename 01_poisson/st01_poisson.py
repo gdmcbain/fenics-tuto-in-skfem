@@ -8,7 +8,7 @@ mesh.refine(3)
 
 V = InteriorBasis(mesh, ElementTriP1())
 
-u_D = 1 + [1, 2] @ mesh.p**2
+u_D = 1 + [1, 2] @ mesh.p ** 2
 
 boundary = mesh.boundary_nodes()
 
@@ -21,10 +21,10 @@ L = -6.0 * asm(unit_load, V)
 u = solve(*condense(a, L, u, D=boundary))
 
 ax = mesh.plot(u)
-ax.get_figure().savefig('poisson.png')
+ax.get_figure().savefig("poisson.png")
 
-mesh.save('u.xdmf', {'u': u})
+mesh.save("u.xdmf", {"u": u})
 
 error = u - u_D
-print('error_L2  =', np.sqrt(error.T @ asm(mass, V) @ error))
-print('error_max =', np.linalg.norm(error, np.inf))
+print("error_L2  =", np.sqrt(error.T @ asm(mass, V) @ error))
+print("error_max =", np.linalg.norm(error, np.inf))
