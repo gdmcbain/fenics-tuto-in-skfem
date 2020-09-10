@@ -9,13 +9,13 @@ from skfem.models.general import divergence
 from meshio.xdmf import TimeSeriesWriter
 
 
-@skfem.bilinear_form
-def vector_mass(u, du, v, dv, w):
+@skfem.BilinearForm
+def vector_mass(u, v, w):
     return sum(v * u)
 
 
-@skfem.bilinear_form
-def port_pressure(u, du, v, dv, w):
+@skfem.BilinearForm
+def port_pressure(u, v, w):
     return sum(v * (u * w.n))
 
 

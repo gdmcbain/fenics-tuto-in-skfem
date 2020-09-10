@@ -19,8 +19,8 @@ R0 = .6
 def load_f(x):
     return 4 / np.exp(beta**2 * (x[0]**2 + (x[1] - R0)**2))
 
-@linear_form
-def load(v, dv, w):
+@LinearForm
+def load(v, w):
     return v * load_f(w.x)
 
 A = asm(laplace, basis)
