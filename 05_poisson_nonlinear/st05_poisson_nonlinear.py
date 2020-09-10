@@ -8,8 +8,9 @@ from sympy.vector import CoordSys3D, gradient, divergence
 from sympy.utilities.lambdify import lambdify
 
 from skfem import (MeshTri, InteriorBasis, ElementTriP1,
-                   bilinear_form, linear_form, asm, solve, condense)
+                   BilinearForm, LinearForm, asm, solve, condense)
 from skfem.models.poisson import laplace
+from skfem.visuals.matplotlib import plot
 
 
 output_dir = Path('poisson_nonlinear')
@@ -22,7 +23,7 @@ except FileExistsError:
 
 def q(u):
     """Return nonlinear coefficient"""
-    return 1 + u**2
+    return 1 + u * u
 
 
 R = CoordSys3D('R')
@@ -45,24 +46,24 @@ boundary = V.get_dofs().all()
 interior = V.complement_dofs(boundary)
 
 
-@linear_form
-def load(v, dv, w):
+@LinearForm
+def load(v, w):
     return v * apply(f, w.x)
 
 
 b = asm(load, V)
 
 
-@bilinear_form
-def diffusion_form(u, du, v, dv, w):
-    return sum(dv * (q(w.w) * du))
+@BilinearForm
+def diffusion_form(u, v, w):
+    return sum(v.grad * (q(w['w']) * u.grad))
 
 
 def diffusion_matrix(u):
     return asm(diffusion_form, V, w=V.interpolate(u))
 
 dirichlet = apply(u_exact, mesh.p)    # P1 nodal interpolation
-mesh.plot(dirichlet).get_figure().savefig(str(output_dir.joinpath('exact.png')))
+plot(V, dirichlet).get_figure().savefig(str(output_dir.joinpath('exact.png')))
 
 
 def residual(u):
@@ -79,6 +80,6 @@ if result.success:
     u = result.x
     print('Success.  Residual =', np.linalg.norm(residual(u), np.inf))
     print('Nodal Linf error =', np.linalg.norm(u - dirichlet, np.inf))
-    mesh.plot(u).get_figure().savefig(str(output_dir.joinpath('solution.png')))
+    plot(V, u).get_figure().savefig(str(output_dir.joinpath('solution.png')))
 else:
     print(result)

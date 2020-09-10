@@ -15,13 +15,13 @@ from skfem.models.poisson import laplace, vector_laplace
 import pyamgcl
 
 
-@skfem.bilinear_form
-def vector_mass(u, du, v, dv, w):
+@skfem.BilinearForm
+def vector_mass(u, v, w):
     return sum(v * u)
 
 
-@skfem.linear_form
-def acceleration(v, dv, w):
+@skfem.LinearForm
+def acceleration(v, w):
     """Compute the vector (v, u . grad u) for given velocity u
 
     passed in via w after having been interpolated onto its quadrature
@@ -34,12 +34,11 @@ def acceleration(v, dv, w):
         u_j u_{i,j} v_i.
 
     """
-    u, du = w.w, w.dw
-    return sum(np.einsum('j...,ij...->i...', u, du) * v)
+    return sum(np.einsum('j...,ij...->i...', w['wind'], w['wind'].grad) * v)
 
 
-@skfem.bilinear_form
-def port_pressure(u, du, v, dv, w):
+@skfem.BilinearForm
+def port_pressure(u, v, w):
     """v is the P2 velocity test-function, u a P1 pressure"""
     return sum(v * (u * w.n))
 
@@ -129,7 +128,7 @@ with TimeSeriesWriter(Path(__file__).with_suffix('.xdmf').name) as writer:
 
         uv = skfem.solve(*skfem.condense(
             K_lhs, K_rhs @ uv_ - P @ (2 * p_ - p__)
-            - skfem.asm(acceleration, basis['u'], w=basis['u'].interpolate(u)),
+            - skfem.asm(acceleration, basis['u'], wind=basis['u'].interpolate(u)),
             uv0, D=dirichlet['u']),
                          solver=solvers[0])
 

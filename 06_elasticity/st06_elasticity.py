@@ -4,7 +4,7 @@ import numpy as np
 
 from skfem import (MeshTet,
                    ElementTetP1, ElementVectorH1,
-                   InteriorBasis, asm, linear_form,
+                   InteriorBasis, asm, LinearForm,
                    condense, solve)
 from skfem.models.elasticity import linear_elasticity
 
@@ -29,9 +29,9 @@ free = basis.complement_dofs(clamped)
 
 K = asm(linear_elasticity(lambda_, mu), basis)
 
-@linear_form
-def load(v, dv, w):
-    return -rho * g * v[2]
+@LinearForm
+def load(v, w):
+    return -rho * g * v.value[2]
 
 f = asm(load, basis)
 
