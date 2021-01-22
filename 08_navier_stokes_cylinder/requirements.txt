@@ -1,5 +1,6 @@
 dmsh==0.2.2
 gmsh
 h5py
+matplotlib
 meshplex<0.14
 pygmsh<7
