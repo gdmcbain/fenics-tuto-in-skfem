@@ -1,2 +1,4 @@
 dmsh==0.2.2
+gmsh
 meshplex<0.14
+pygmsh<7
