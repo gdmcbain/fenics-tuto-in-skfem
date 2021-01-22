@@ -100,7 +100,7 @@ P = B.T + skfem.asm(
     ),
 )
 
-t_final = 5.0 / 1e2
+t_final = 5.0
 dt = 0.001
 
 nu = 0.001
