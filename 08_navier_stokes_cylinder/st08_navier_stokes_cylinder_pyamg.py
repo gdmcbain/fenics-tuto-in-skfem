@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import Callable
 
@@ -5,13 +6,10 @@ import numpy as np
 from scipy.sparse import spmatrix
 from scipy.sparse.linalg import LinearOperator
 
-from pygmsh import generate_mesh
-from pygmsh.built_in import Geometry
 
 from meshio.xdmf import TimeSeriesWriter
 
 import skfem
-from skfem.importers.meshio import from_meshio
 from skfem.models.general import divergence
 from skfem.models.poisson import laplace, vector_laplace
 from skfem.utils import LinearSolver
@@ -47,19 +45,20 @@ def port_pressure(u, v, w):
     return sum(v * (u * w.n))
 
 
-radius = 0.05
-height = 0.41
+parser = ArgumentParser()
+parser.add_argument("--mesh", type=Path)
+args = parser.parse_args()
 
-geom = Geometry()
-cylinder = geom.add_circle([0.2, 0.2, 0.0], radius, lcar=radius / 2)
-channel = geom.add_rectangle(
-    0.0, 2.2, 0.0, height, 0, holes=[cylinder], lcar=radius / 2
-)
-geom.add_physical(channel.surface, "domain")
-geom.add_physical(channel.lines[1], "outlet")
-geom.add_physical(channel.lines[3], "inlet")
+if args.mesh:
+    from skfem.io.json import from_file
 
-mesh = from_meshio(generate_mesh(geom, dim=2))
+    mesh = from_file(args.mesh)
+else:
+    from cylinder_dmsh import CylinderDmsh
+
+    mesher = CylinderDmsh()
+    mesh = mesher.mesh
+    mesher.save()
 
 element = {"u": skfem.ElementVectorH1(skfem.ElementTriP2()), "p": skfem.ElementTriP1()}
 basis = {
@@ -99,7 +98,8 @@ dirichlet = {
 
 uv0 = np.zeros(basis["u"].N)
 inlet_dofs = basis["u"].get_dofs(mesh.boundaries["inlet"]).all("u^1")
-inlet_y_lim = [p.x[1] for p in channel.lines[3].points[::-1]]
+inlet_y = mesh.p[1, mesh.facets[:, mesh.boundaries["inlet"]]]
+inlet_y_lim = inlet_y.min(), inlet_y.max()
 monic = np.polynomial.polynomial.Polynomial.fromroots(inlet_y_lim)
 uv0[inlet_dofs] = -6 * monic(basis["u"].doflocs[1, inlet_dofs]) / inlet_y_lim[1] ** 2
 
