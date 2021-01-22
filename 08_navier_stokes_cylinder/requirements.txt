@@ -1,0 +1,2 @@
+dmsh==0.2.2
+meshplex<0.14
