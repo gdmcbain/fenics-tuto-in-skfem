@@ -10,6 +10,7 @@ from scipy.sparse.linalg import LinearOperator
 from meshio.xdmf import TimeSeriesWriter
 
 import skfem
+from skfem.io.json import from_file
 from skfem.models.general import divergence
 from skfem.models.poisson import laplace, vector_laplace
 from skfem.utils import LinearSolver
@@ -45,26 +46,49 @@ def port_pressure(u, v, w):
     return sum(v * (u * w.n))
 
 
+def probe(
+    basis: skfem.InteriorBasis, points: np.ndarray
+) -> Callable[[np.ndarray], np.ndarray]:
+
+    finder = basis.mesh.element_finder(mapping=basis.mapping)
+    cells = finder(*points)
+    pts = basis.mapping.invF(points[:, :, np.newaxis], tind=cells)
+
+    def interpolator(u: np.ndarray):
+        w = np.zeros(points.shape[1])
+        for k in range(basis.Nbfun):
+            phi = basis.elem.gbasis(basis.mapping, pts, k, tind=cells)[0][0].flatten()
+            w += u[basis.element_dofs[k, cells]] * phi
+        return w
+
+    return interpolator
+
+
 parser = ArgumentParser()
 parser.add_argument("--mesh", type=Path)
 args = parser.parse_args()
 
 if args.mesh:
-    from skfem.io.json import from_file
 
     mesh = from_file(args.mesh)
 else:
-    from cylinder_dmsh import CylinderDmsh
+    try:
+        mesh = from_file(Path("cylinder.json"))
+    except Exception as e:
+        from cylinder_dmsh import CylinderDmsh
 
-    mesher = CylinderDmsh()
-    mesh = mesher.mesh
-    mesher.save()
+        print("Couldn't find cylinder.json; generating in dmsh.")
+        mesher = CylinderDmsh()
+        mesh = mesher.mesh
+        mesher.save()
 
 element = {"u": skfem.ElementVectorH1(skfem.ElementTriP2()), "p": skfem.ElementTriP1()}
 basis = {
     **{v: skfem.InteriorBasis(mesh, e, intorder=4) for v, e in element.items()},
     "inlet": skfem.FacetBasis(mesh, element["u"], facets=mesh.boundaries["inlet"]),
 }
+pressure_probe = probe(basis["p"], np.array([(0.15, 0.2), (0.25, 0.2)]).T)
+
 M = skfem.asm(vector_mass, basis["u"])
 L = {"u": skfem.asm(vector_laplace, basis["u"]), "p": skfem.asm(laplace, basis["p"])}
 B = -skfem.asm(divergence, basis["u"], basis["p"])
@@ -121,6 +145,8 @@ for A, v in [(K_lhs, "u"), (L["p"], "p"), (M / dt, "u")]:
 
     solvers.append(s(A, v))
 
+pressure_history = []
+
 with TimeSeriesWriter(Path(__file__).with_suffix(".xdmf")) as writer:
 
     writer.write_points_cells(embed(mesh.p.T), {"triangle": mesh.t.T})
@@ -162,9 +188,13 @@ with TimeSeriesWriter(Path(__file__).with_suffix(".xdmf")) as writer:
 
         # postprocessing
 
+        pressure_history.append([t, *pressure_probe(p)])
+
         writer.write_data(
             t,
             point_data={"pressure": p, "velocity": embed(uv[basis["u"].nodal_dofs].T)},
         )
 
         print(f"t = {t}, max u = ", u[basis["u"].nodal_dofs].max())
+
+np.savetxt(Path(__file__).with_suffix(".csv"), pressure_history, delimiter=",")
