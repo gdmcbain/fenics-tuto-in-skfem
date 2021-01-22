@@ -1,21 +1,26 @@
-from pathlib import Path
+from functools import cached_property
 
 import dmsh
-import skfem
-import skfem.io.json
+from skfem import MeshTri
 
-length = 2.2
-height = 0.41
-radius = 0.05
+from cylinder import Cylinder
 
-geo = dmsh.Difference(
-    dmsh.Rectangle(0.0, length, 0.0, height),
-    dmsh.Circle([.2, .2], radius)
-)
+class CylinderDmsh(Cylinder):
 
-points, triangles = dmsh.generate(geo, 0.025, tol=1e-9)
-mesh = skfem.MeshTri(points.T, triangles.T)
-mesh.define_boundary("inlet", lambda x: x[0] == .0)
-mesh.define_boundary("outlet", lambda x: x[0] == length)
+    @cached_property
+    def mesh(self) -> MeshTri:
+        geo = dmsh.Difference(
+            dmsh.Rectangle(0.0, self.length, 0.0, self.height),
+            dmsh.Circle(self.centre, self.radius)
+        )
 
-skfem.io.json.to_file(mesh, Path(__file__).with_suffix('.json'))
+        points, triangles = dmsh.generate(geo, 0.025, tol=1e-9)
+        m = MeshTri(points.T, triangles.T)
+        m.define_boundary("inlet", lambda x: x[0] == .0)
+        m.define_boundary("outlet", lambda x: x[0] == self.length)
+
+        return m
+
+
+if __name__ == "__main__":
+    CylinderDmsh().save()
