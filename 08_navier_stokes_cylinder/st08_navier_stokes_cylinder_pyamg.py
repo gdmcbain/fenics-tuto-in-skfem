@@ -109,7 +109,8 @@ dirichlet = {
 
 uv0 = np.zeros(basis["u"].N)
 inlet_dofs = basis["u"].get_dofs(mesh.boundaries["inlet"]).all("u^1")
-inlet_y_lim = [p.x[1] for p in channel.lines[3].points[::-1]]
+inlet_y = mesh.p[1, mesh.facets[:, mesh.boundaries["inlet"]]]
+inlet_y_lim = inlet_y.min(), inlet_y.max()
 monic = np.polynomial.polynomial.Polynomial.fromroots(inlet_y_lim)
 uv0[inlet_dofs] = -6 * monic(basis["u"].doflocs[1, inlet_dofs]) / inlet_y_lim[1] ** 2
 
