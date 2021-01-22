@@ -1,4 +1,5 @@
 dmsh==0.2.2
 gmsh
+h5py
 meshplex<0.14
 pygmsh<7
