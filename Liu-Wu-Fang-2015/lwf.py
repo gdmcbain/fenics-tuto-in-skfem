@@ -2,8 +2,9 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from scipy.sparse import bmat, csr_matrix
-from scipy.sparse.linalg import gmres
+from scipy.sparse import bmat, csr_matrix, spmatrix
+from scipy.sparse.linalg import gmres, splu
+from scipy.sparse.linalg.interface import LinearOperator
 
 import skfem
 from skfem.helpers import dot
@@ -52,6 +53,8 @@ B = -skfem.asm(divergence, basis["u"], basis["p"])
 Q = skfem.asm(mass, basis["p"])
 D = basis["u"].find_dofs()
 
+diagQ = Q.diagonal()
+
 uvp = np.zeros(sum(b.N for b in basis.values()))
 uvp[D["lid"].all()[::2]] = 1.0
 logging.info("Assembled basic operators.")
@@ -64,25 +67,37 @@ def velocity_matrix(u: np.ndarray) -> csr_matrix:
 t = 0.0
 t_max = 2.0
 
+K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * Q]], "csr")
+Kint = skfem.condense(K0, D=D, expand=False)
+Aint = Kint[: -basis["p"].N, : -basis["p"].N]
+Alu = splu(Aint)
+Apc = LinearOperator(Aint.shape, Alu.solve, dtype=M.dtype)
+
+def precondition(uvp: np.ndarray) -> np.ndarray:
+    uv, p = np.split(uvp, Aint.shape[:1])
+    return np.concatenate([Apc @ uv, p / diagQ])
+
+    
+pc = LinearOperator(Kint.shape, precondition, dtype=Q.dtype)
+logging.info("Factored Stokes LU preconditioner.")
+
 while True:  # time-stepping
     t += dt
 
     u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
-    K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * Q]], "csr")
-    Kint, rhs, uint, I = skfem.condense(K0, f, uvp, D=D)
-
+    _, rhs, uint, I = skfem.condense(K0, f, uvp, D=D)
     uvp = skfem.solve(Kint, rhs, uint, I)
 
     iterations_picard = 0
     u = uvp[: basis["u"].N]
-    pc = skfem.build_pc_ilu(Kint)
+
     while True:  # Picard
         uvp = skfem.solve(
             *skfem.condense(
                 bmat([[velocity_matrix(u), B.T], [B, 1e-6 * Q]], "csr"), f, uvp, D=D
             ),
-            solver=skfem.solver_iter_krylov(gmres, verbose=True, M=pc)
+            solver=skfem.solver_iter_krylov(gmres, verbose=True, M=pc),
         )
         iterations_picard += 1
         u_new = uvp[: basis["u"].N]
