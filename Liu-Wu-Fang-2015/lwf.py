@@ -35,6 +35,8 @@ print({v: b.N for v, b in basis.items()})
 
 dt = 0.1
 nu = 1.0 / 20
+tol_picard = 1e-3
+tol_steady = 1e-3
 
 M = skfem.asm(vector_mass, basis["u"])
 velocity_matrix0 = M / dt + skfem.asm(vector_laplace, basis["u"]) * nu
@@ -42,29 +44,53 @@ B = -skfem.asm(divergence, basis["u"], basis["p"])
 C = skfem.asm(mass, basis["p"])
 D = basis["u"].find_dofs()
 
-uvp0 = np.zeros(sum(b.N for b in basis.values()))
-uvp0[D["lid"].all()[::2]] = 1.0
+uvp = np.zeros(sum(b.N for b in basis.values()))
+uvp[D["lid"].all()[::2]] = 1.0
 
 
 def velocity_matrix(u: np.ndarray) -> csr_matrix:
-    return velocity_matrix0 + skfem.asm(oseen, basis["uu"], w=basis["u"].interpolate(u))
+    return velocity_matrix0 + skfem.asm(oseen, basis["u"], w=basis["u"].interpolate(u))
 
 
 t = 0.0
-uvp = uvp0.copy()
-t_max = 1.0
+t_max = 2.0
 
 while True:  # time-stepping
     t += dt
 
-    f = np.concatenate([M @ uvp[: basis["u"].N] / dt, np.zeros(basis["p"].N)])
+    u_old = uvp[:basis["u"].N]
+    f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
     uvp = skfem.solve(
         *skfem.condense(
             bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr"), f, uvp, D=D
         )
     )
-    print(t, uvp[: basis["u"].N] @ M @ uvp[: basis["u"].N])
-    if t > 4 * dt:
+
+    iterations_picard = 0
+    u = uvp[:basis["u"].N]
+    while True:  # Picard
+        uvp = skfem.solve(
+            *skfem.condense(
+                bmat([[velocity_matrix(u), B.T], [B, 1e-6 * C]], "csr"), f, uvp, D=D
+            )
+        )
+        iterations_picard += 1
+        u_new = uvp[: basis["u"].N]
+        if np.linalg.norm(u_new - u) < tol_picard:
+            break
+        u = u_new
+    change = np.linalg.norm(u - u_old) 
+    print(
+        "t = ",
+        t,
+        "; Picard iterations: ",
+        iterations_picard,
+        "||u|| = ",
+        np.linalg.norm(uvp[: basis["u"].N]),
+        "change: ", change
+    )
+
+    if change < tol_steady:
         break
 
 ax = draw(mesh)
