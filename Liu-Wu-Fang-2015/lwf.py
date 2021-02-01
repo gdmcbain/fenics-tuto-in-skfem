@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -21,18 +22,24 @@ def oseen(u, v, w):
     return dot(np.einsum("j...,ij...->i...", w["w"], u.grad), v)
 
 
+logging.basicConfig(
+    format="%(levelname)s %(asctime)s %(message)s",
+    filename="log.python." + Path(__file__).stem,
+    level=logging.INFO,
+)
+
+logging.info("Beginning.")
 mesh = skfem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 5)] * 2)
 mesh.define_boundary("lid", lambda x: x[1] == 1.0)
 mesh.define_boundary(
     "wall",
     lambda x: np.logical_or(np.logical_or(x[0] == 0.0, x[0] == 1.0), x[1] == 0.0),
 )
-print(mesh)
+logging.info(f"mesh: {mesh}")
 
 element = {"u": skfem.ElementVectorH1(skfem.ElementQuad2()), "p": skfem.ElementQuad0()}
 basis = {v: skfem.InteriorBasis(mesh, e, intorder=3) for v, e in element.items()}
-print({v: b.N for v, b in basis.items()})
-
+logging.info(f"basis: {({v: b.N for v, b in basis.items()})}")
 
 dt = 0.1
 nu = 1.0 / 20
@@ -82,16 +89,7 @@ while True:  # time-stepping
             break
         u = u_new
     change = np.linalg.norm(u - u_old)
-    print(
-        "t = ",
-        t,
-        "; Picard iterations: ",
-        iterations_picard,
-        "||u|| = ",
-        np.linalg.norm(uvp[: basis["u"].N]),
-        "change: ",
-        change,
-    )
+    logging.info(f"t = {t}, {iterations_picard} Picard iterations, ||u|| = {{change}}")
 
     if change < tol_steady:
         break

@@ -9,7 +9,7 @@ rule clean:
         from pathlib import Path
         from shutil import rmtree
 
-        for pattern in ['*.png']:
+        for pattern in ['*.png', 'log.*']:
             for f in Path('.').glob(pattern):
                 if f.is_file():
                     f.unlink()
