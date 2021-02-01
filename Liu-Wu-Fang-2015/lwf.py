@@ -90,7 +90,7 @@ while True:  # time-stepping
             break
         u = u_new
     change = np.linalg.norm(u - u_old)
-    logging.info(f"t = {t}, {iterations_picard} Picard iterations, ||u|| = {{change}}")
+    logging.info(f"t = {t}, {iterations_picard} Picard iterations, ||u|| = {change}")
 
     if change < tol_steady:
         break
