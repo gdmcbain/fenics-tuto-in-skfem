@@ -20,7 +20,7 @@ def oseen(u, v, w):
     return dot(np.einsum("j...,ij...->i...", w["w"], u.grad), v)
 
 
-mesh = skfem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 3)] * 2)
+mesh = skfem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 5)] * 2)
 mesh.define_boundary("lid", lambda x: x[1] == 1.0)
 mesh.define_boundary(
     "wall",
@@ -36,9 +36,8 @@ print({v: b.N for v, b in basis.items()})
 dt = 0.1
 nu = 1.0 / 20
 
-velocity_matrix0 = (
-    skfem.asm(vector_mass, basis["u"]) / dt + skfem.asm(vector_laplace, basis["u"]) * nu
-)
+M = skfem.asm(vector_mass, basis["u"])
+velocity_matrix0 = M / dt + skfem.asm(vector_laplace, basis["u"]) * nu
 B = -skfem.asm(divergence, basis["u"], basis["p"])
 C = skfem.asm(mass, basis["p"])
 D = basis["u"].find_dofs()
@@ -51,35 +50,24 @@ def velocity_matrix(u: np.ndarray) -> csr_matrix:
     return velocity_matrix0 + skfem.asm(oseen, basis["uu"], w=basis["u"].interpolate(u))
 
 
-def picard_step(u_old: np.ndarray, u_k: np.ndarray) -> np.ndarray:
-    return skfem.solve(
-        *skfem.condense(
-            bmat([[velocity_matrix(u_k), B.T], [B, None]]),
-            np.concatenate(u_old / dt, np.zeros(basis["p"].N)),
-            uvp0,
-            D=D,
-        )
-    )
-
-
-def step(t: float, uvp: np.ndarray) -> tuple[float, np.ndarray]:
-    u_old = uvp[: basis["u"].N]
-    pass
-
-
 t = 0.0
 uvp = uvp0.copy()
+t_max = 1.0
 
 while True:  # time-stepping
     t += dt
-    f = np.concatenate([uvp[: basis["u"].N], np.zeros(basis["p"].N)])
-    u0 = skfem.solve(
+
+    f = np.concatenate([M @ uvp[: basis["u"].N] / dt, np.zeros(basis["p"].N)])
+    uvp = skfem.solve(
         *skfem.condense(
-            bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr"), f, uvp0, D=D
+            bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr"), f, uvp, D=D
         )
     )
-    break
+    print(t, uvp[: basis["u"].N] @ M @ uvp[: basis["u"].N])
+    if t > 4 * dt:
+        break
 
 ax = draw(mesh)
-plot(basis["p"], u0[-basis["p"].N :], ax=ax)
-savefig(f"{Path(__file__).stem}-pressure.png")
+plot(basis["p"], uvp[-basis["p"].N :], ax=ax)
+ax.quiver(*mesh.p, *uvp[basis["u"].nodal_dofs])
+savefig(Path(__file__).with_suffix(".png"))
