@@ -49,7 +49,7 @@ tol_steady = 1e-3
 M = skfem.asm(vector_mass, basis["u"])
 velocity_matrix0 = M / dt + skfem.asm(vector_laplace, basis["u"]) * nu
 B = -skfem.asm(divergence, basis["u"], basis["p"])
-C = skfem.asm(mass, basis["p"])
+Q = skfem.asm(mass, basis["p"])
 D = basis["u"].find_dofs()
 
 uvp = np.zeros(sum(b.N for b in basis.values()))
@@ -69,7 +69,7 @@ while True:  # time-stepping
 
     u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
-    K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr")
+    K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * Q]], "csr")
     Kint, rhs, uint, I = skfem.condense(K0, f, uvp, D=D)
 
     uvp = skfem.solve(Kint, rhs, uint, I)
@@ -80,7 +80,7 @@ while True:  # time-stepping
     while True:  # Picard
         uvp = skfem.solve(
             *skfem.condense(
-                bmat([[velocity_matrix(u), B.T], [B, 1e-6 * C]], "csr"), f, uvp, D=D
+                bmat([[velocity_matrix(u), B.T], [B, 1e-6 * Q]], "csr"), f, uvp, D=D
             ),
             solver=skfem.solver_iter_krylov(gmres, verbose=True, M=pc)
         )
