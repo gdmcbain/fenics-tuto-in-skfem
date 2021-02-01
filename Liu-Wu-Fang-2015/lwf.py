@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.sparse import bmat, csr_matrix
+from scipy.sparse.linalg import gmres
 
 import skfem
 from skfem.helpers import dot
@@ -58,28 +59,29 @@ t_max = 2.0
 while True:  # time-stepping
     t += dt
 
-    u_old = uvp[:basis["u"].N]
+    u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
-    uvp = skfem.solve(
-        *skfem.condense(
-            bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr"), f, uvp, D=D
-        )
-    )
+    K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr")
+    Kint, rhs, uint, I = skfem.condense(K0, f, uvp, D=D)
+
+    uvp = skfem.solve(Kint, rhs, uint, I)
 
     iterations_picard = 0
-    u = uvp[:basis["u"].N]
+    u = uvp[: basis["u"].N]
+    pc = skfem.build_pc_ilu(Kint)
     while True:  # Picard
         uvp = skfem.solve(
             *skfem.condense(
                 bmat([[velocity_matrix(u), B.T], [B, 1e-6 * C]], "csr"), f, uvp, D=D
-            )
+            ),
+            solver=skfem.solver_iter_krylov(gmres, verbose=True, M=pc)
         )
         iterations_picard += 1
         u_new = uvp[: basis["u"].N]
         if np.linalg.norm(u_new - u) < tol_picard:
             break
         u = u_new
-    change = np.linalg.norm(u - u_old) 
+    change = np.linalg.norm(u - u_old)
     print(
         "t = ",
         t,
@@ -87,7 +89,8 @@ while True:  # time-stepping
         iterations_picard,
         "||u|| = ",
         np.linalg.norm(uvp[: basis["u"].N]),
-        "change: ", change
+        "change: ",
+        change,
     )
 
     if change < tol_steady:
