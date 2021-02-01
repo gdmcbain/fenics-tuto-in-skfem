@@ -1,10 +1,13 @@
+from pathlib import Path
+
 import numpy as np
 from scipy.sparse import bmat, csr_matrix
 
 import skfem
 from skfem.helpers import dot
 from skfem.models.general import divergence
-from skfem.models.poisson import vector_laplace
+from skfem.models.poisson import mass, vector_laplace
+from skfem.visuals.matplotlib import draw, plot, savefig
 
 
 @skfem.BilinearForm
@@ -37,9 +40,11 @@ velocity_matrix0 = (
     skfem.asm(vector_mass, basis["u"]) / dt + skfem.asm(vector_laplace, basis["u"]) * nu
 )
 B = -skfem.asm(divergence, basis["u"], basis["p"])
+C = skfem.asm(mass, basis["p"])
+D = basis["u"].find_dofs()
 
 uvp0 = np.zeros(sum(b.N for b in basis.values()))
-uvp0[basis["u"].find_dofs()["lid"].all()[::2]] = 1.
+uvp0[D["lid"].all()[::2]] = 1.0
 
 
 def velocity_matrix(u: np.ndarray) -> csr_matrix:
@@ -52,7 +57,7 @@ def picard_step(u_old: np.ndarray, u_k: np.ndarray) -> np.ndarray:
             bmat([[velocity_matrix(u_k), B.T], [B, None]]),
             np.concatenate(u_old / dt, np.zeros(basis["p"].N)),
             uvp0,
-            D=basis["u"].find_dofs()["lid"],
+            D=D,
         )
     )
 
@@ -60,3 +65,21 @@ def picard_step(u_old: np.ndarray, u_k: np.ndarray) -> np.ndarray:
 def step(t: float, uvp: np.ndarray) -> tuple[float, np.ndarray]:
     u_old = uvp[: basis["u"].N]
     pass
+
+
+t = 0.0
+uvp = uvp0.copy()
+
+while True:  # time-stepping
+    t += dt
+    f = np.concatenate([uvp[: basis["u"].N], np.zeros(basis["p"].N)])
+    u0 = skfem.solve(
+        *skfem.condense(
+            bmat([[velocity_matrix0, B.T], [B, 1e-6 * C]], "csr"), f, uvp0, D=D
+        )
+    )
+    break
+
+ax = draw(mesh)
+plot(basis["p"], u0[-basis["p"].N :], ax=ax)
+savefig(f"{Path(__file__).stem}-pressure.png")
