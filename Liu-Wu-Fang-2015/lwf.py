@@ -54,6 +54,7 @@ D = basis["u"].find_dofs()
 
 uvp = np.zeros(sum(b.N for b in basis.values()))
 uvp[D["lid"].all()[::2]] = 1.0
+logging.info("Assembled basic operators.")
 
 
 def velocity_matrix(u: np.ndarray) -> csr_matrix:
