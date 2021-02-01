@@ -1,0 +1,17 @@
+rule all:
+    input: 'lwf.png'
+rule run:
+    input: '{a}.py'
+    output: '{a}.png'
+    shell: 'python {input}'
+rule clean:
+    run:
+        from pathlib import Path
+        from shutil import rmtree
+
+        for pattern in ['*.png']:
+            for f in Path('.').glob(pattern):
+                if f.is_file():
+                    f.unlink()
+                elif f.is_dir():
+                    rmtree(f)
