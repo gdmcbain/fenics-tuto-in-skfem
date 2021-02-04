@@ -1,24 +1,25 @@
 import logging
 from pathlib import Path
 
+from matplotlib.tri import Triangulation
 import numpy as np
 from scipy.sparse import bmat, csr_matrix, spmatrix
 from scipy.sparse.linalg import gmres, splu
 from scipy.sparse.linalg.interface import LinearOperator
 
-import skfem
+import skfem as fem
 from skfem.helpers import dot
-from skfem.models.general import divergence
-from skfem.models.poisson import mass, vector_laplace
+from skfem.models.general import divergence, rot
+from skfem.models.poisson import laplace, mass, vector_laplace
 from skfem.visuals.matplotlib import draw, plot, savefig
 
 
-@skfem.BilinearForm
+@fem.BilinearForm
 def vector_mass(u, v, w):
     return dot(v, u)
 
 
-@skfem.BilinearForm
+@fem.BilinearForm
 def oseen(u, v, w):
     return dot(np.einsum("j...,ij...->i...", w["w"], u.grad), v)
 
@@ -30,7 +31,7 @@ logging.basicConfig(
 )
 
 logging.info("Beginning.")
-mesh = skfem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 5)] * 2)
+mesh = fem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 4)] * 2)
 mesh.define_boundary("lid", lambda x: x[1] == 1.0)
 mesh.define_boundary(
     "wall",
@@ -38,19 +39,19 @@ mesh.define_boundary(
 )
 logging.info(f"mesh: {mesh}")
 
-element = {"u": skfem.ElementVectorH1(skfem.ElementQuad2()), "p": skfem.ElementQuad0()}
-basis = {v: skfem.InteriorBasis(mesh, e, intorder=3) for v, e in element.items()}
+element = {"u": fem.ElementVectorH1(fem.ElementQuad2()), "p": fem.ElementQuad0()}
+basis = {v: fem.InteriorBasis(mesh, e, intorder=3) for v, e in element.items()}
 logging.info(f"basis: {({v: b.N for v, b in basis.items()})}")
 
-dt = 0.1
 nu = 1.0 / 20
+dt = 10.0 * mesh.param()
 tol_picard = 1e-3
 tol_steady = 1e-3
 
-M = skfem.asm(vector_mass, basis["u"])
-velocity_matrix0 = M / dt + skfem.asm(vector_laplace, basis["u"]) * nu
-B = -skfem.asm(divergence, basis["u"], basis["p"])
-Q = skfem.asm(mass, basis["p"])
+M = fem.asm(vector_mass, basis["u"])
+velocity_matrix0 = M / dt + fem.asm(vector_laplace, basis["u"]) * nu
+B = -fem.asm(divergence, basis["u"], basis["p"])
+Q = fem.asm(mass, basis["p"])
 D = basis["u"].find_dofs()
 
 diagQ = Q.diagonal()
@@ -61,23 +62,24 @@ logging.info("Assembled basic operators.")
 
 
 def velocity_matrix(u: np.ndarray) -> csr_matrix:
-    return velocity_matrix0 + skfem.asm(oseen, basis["u"], w=basis["u"].interpolate(u))
+    return velocity_matrix0 + fem.asm(oseen, basis["u"], w=basis["u"].interpolate(u))
 
 
 t = 0.0
 t_max = 2.0
 
-K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * Q]], "csr")
-Kint = skfem.condense(K0, D=D, expand=False)
+K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * Q]], "csc")
+Kint = fem.condense(K0, D=D, expand=False)
 Aint = Kint[: -basis["p"].N, : -basis["p"].N]
 Alu = splu(Aint)
 Apc = LinearOperator(Aint.shape, Alu.solve, dtype=M.dtype)
+
 
 def precondition(uvp: np.ndarray) -> np.ndarray:
     uv, p = np.split(uvp, Aint.shape[:1])
     return np.concatenate([Apc @ uv, p / diagQ])
 
-    
+
 pc = LinearOperator(Kint.shape, precondition, dtype=Q.dtype)
 logging.info("Factored Stokes LU preconditioner.")
 
@@ -86,18 +88,18 @@ while True:  # time-stepping
 
     u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
-    _, rhs, uint, I = skfem.condense(K0, f, uvp, D=D)
-    uvp = skfem.solve(Kint, rhs, uint, I)
+    _, rhs, uint, I = fem.condense(K0, f, uvp, D=D)
+    uvp = fem.solve(Kint, rhs, uint, I)
 
     iterations_picard = 0
     u = uvp[: basis["u"].N]
 
     while True:  # Picard
-        uvp = skfem.solve(
-            *skfem.condense(
+        uvp = fem.solve(
+            *fem.condense(
                 bmat([[velocity_matrix(u), B.T], [B, 1e-6 * Q]], "csr"), f, uvp, D=D
             ),
-            solver=skfem.solver_iter_krylov(gmres, verbose=True, M=pc),
+            solver=fem.solver_iter_krylov(gmres, verbose=True, M=pc),
         )
         iterations_picard += 1
         u_new = uvp[: basis["u"].N]
@@ -105,12 +107,22 @@ while True:  # time-stepping
             break
         u = u_new
     change = np.linalg.norm(u - u_old)
-    logging.info(f"t = {t}, {iterations_picard} Picard iterations, ||u|| = {change}")
+    logging.info(f"t = {t}, {iterations_picard} Picard iterations, ||Delta u|| = {change}")
 
     if change < tol_steady:
         break
 
+basis["psi"] = basis["u"].with_element(fem.ElementQuad2())
+vorticity = fem.asm(rot, basis["psi"], w=basis["u"].interpolate(u))
+logging.info("Computed vorticity.")
+psi = fem.solve(
+    *fem.condense(fem.asm(laplace, basis["psi"]), vorticity, D=basis["psi"].find_dofs())
+)
+logging.info("Computed streamfunction.")
+
 ax = draw(mesh)
 plot(basis["p"], uvp[-basis["p"].N :], ax=ax)
 ax.quiver(*mesh.p, *uvp[basis["u"].nodal_dofs])
+ax.tricontour(Triangulation(*mesh.p, mesh.to_meshtri().t.T), psi[basis["psi"].nodal_dofs.flatten()])
 savefig(Path(__file__).with_suffix(".png"))
+logging.info("Plotted pressure, velocity, and stream-lines.")
