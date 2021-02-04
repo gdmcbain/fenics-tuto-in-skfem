@@ -14,7 +14,7 @@ class CylinderDmsh(Cylinder):
             dmsh.Circle(self.centre, self.radius)
         )
 
-        points, triangles = dmsh.generate(geo, 0.025, tol=1e-9)
+        points, triangles = dmsh.generate(geo, self.lcar, tol=1e-9)
         m = MeshTri(points.T, triangles.T)
         m.define_boundary("inlet", lambda x: x[0] == .0)
         m.define_boundary("outlet", lambda x: x[0] == self.length)
