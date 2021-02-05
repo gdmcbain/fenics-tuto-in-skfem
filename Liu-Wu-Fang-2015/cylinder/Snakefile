@@ -1,7 +1,7 @@
 GMSHIMAGE = "docker://gitlab.memjet.local:4567/msm/gmsh-memjet-extras/gmsh:4.7.1.0"
 
 rule all:
-    input: 'lwf.png'
+    input: 'cylinder_pygmsh-lwf.png'
 rule geometry:
     input: '{a}.py'
     output: '{a}.geo'
@@ -12,15 +12,15 @@ rule mesh:
     container: GMSHIMAGE
     shell: 'gmsh -2 {input}'
 rule run:
-    input: '{a}.py'
-    output: '{a}.png'
+    input: '{a}.py', '{b}.msh'
+    output: '{b}-{a}.png'
     shell: 'python {input}'
 rule clean:
     run:
         from pathlib import Path
         from shutil import rmtree
 
-        for pattern in ['*.png', 'log.*', '*.geo', '*.msh']:
+        for pattern in ['*.png', 'log.*', '*.geo', '*.msh', '*.svg']:
             for f in Path('.').glob(pattern):
                 if f.is_file():
                     f.unlink()
