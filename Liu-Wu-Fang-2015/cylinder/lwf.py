@@ -4,7 +4,7 @@ from pathlib import Path
 from matplotlib.tri import Triangulation
 import numpy as np
 from scipy.sparse import bmat, csr_matrix, spmatrix
-from scipy.sparse.linalg import gmres, splu
+from scipy.sparse.linalg import gcrotmk, splu
 from scipy.sparse.linalg.interface import LinearOperator
 
 import skfem as fem
@@ -107,7 +107,7 @@ while True:  # time-stepping
             *fem.condense(
                 bmat([[velocity_matrix(u), B.T], [B, 1e-6 * Q]], "csr"), f, uvp, D=dirichlet["u"]
             ),
-            solver=fem.solver_iter_krylov(gmres, verbose=True, M=pc),
+            solver=fem.solver_iter_krylov(gcrotmk, verbose=True, M=pc),
         )
         iterations_picard += 1
         u_new = uvp[: basis["u"].N]
