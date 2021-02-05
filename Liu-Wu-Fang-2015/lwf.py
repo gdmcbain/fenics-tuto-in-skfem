@@ -88,8 +88,6 @@ while True:  # time-stepping
 
     u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
-    _, rhs, uint, I = fem.condense(K0, f, uvp, D=D)
-    uvp = fem.solve(Kint, rhs, uint, I)
 
     iterations_picard = 0
     u = uvp[: basis["u"].N]
