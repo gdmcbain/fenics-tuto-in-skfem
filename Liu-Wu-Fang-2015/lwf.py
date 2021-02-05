@@ -31,7 +31,7 @@ logging.basicConfig(
 )
 
 logging.info("Beginning.")
-mesh = fem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 4)] * 2)
+mesh = fem.MeshQuad.init_tensor(*[np.linspace(0, 1, 1 + 2 ** 5)] * 2)
 mesh.define_boundary("lid", lambda x: x[1] == 1.0)
 mesh.define_boundary(
     "wall",
@@ -43,7 +43,7 @@ element = {"u": fem.ElementVectorH1(fem.ElementQuad2()), "p": fem.ElementQuad0()
 basis = {v: fem.InteriorBasis(mesh, e, intorder=3) for v, e in element.items()}
 logging.info(f"basis: {({v: b.N for v, b in basis.items()})}")
 
-nu = 1.0 / 20
+nu = 1.0 / 2e2
 dt = 10.0 * mesh.param()
 tol_picard = 1e-3
 tol_steady = 1e-3
