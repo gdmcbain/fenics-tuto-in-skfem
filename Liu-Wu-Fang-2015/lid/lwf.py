@@ -3,9 +3,8 @@ from pathlib import Path
 
 from matplotlib.tri import Triangulation
 import numpy as np
-from scipy.sparse import bmat, csr_matrix, spmatrix
-from scipy.sparse.linalg import gcrotmk, splu
-from scipy.sparse.linalg.interface import LinearOperator
+from scipy.sparse import bmat, csr_matrix
+from scipy.sparse.linalg import gcrotmk, spilu, LinearOperator
 
 import skfem as fem
 from skfem.helpers import dot
@@ -68,30 +67,26 @@ def velocity_matrix(u: np.ndarray) -> csr_matrix:
 t = 0.0
 t_max = 2.0
 
-K0 = bmat([[velocity_matrix0, B.T], [B, 1e-6 * Q]], "csc")
-Kint = fem.condense(K0, D=D, expand=False)
-Aint = Kint[: -basis["p"].N, : -basis["p"].N]
-Alu = splu(Aint)
-Apc = LinearOperator(Aint.shape, Alu.solve, dtype=M.dtype)
-
-
-def precondition(uvp: np.ndarray) -> np.ndarray:
-    uv, p = np.split(uvp, Aint.shape[:1])
-    return np.concatenate([Apc @ uv, p / diagQ])
-
-
-pc = LinearOperator(Kint.shape, precondition, dtype=Q.dtype)
-logging.info("Factored Stokes LU preconditioner.")
 
 while True:  # time-stepping
     t += dt
 
-    u_old = uvp[: basis["u"].N]
+    u = u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
 
-    iterations_picard = 0
-    u = uvp[: basis["u"].N]
+    K0 = bmat([[velocity_matrix(u), B.T], [B, 1e-6 * Q]], "csc")
+    Kint = fem.condense(K0, D=D, expand=False)
+    Aint = Kint[: -basis["p"].N, : -basis["p"].N]
+    Alu = spilu(Aint)
+    Apc = LinearOperator(Aint.shape, Alu.solve, dtype=M.dtype)
 
+    def precondition(uvp: np.ndarray) -> np.ndarray:
+        uv, p = np.split(uvp, Aint.shape[:1])
+        return np.concatenate([Apc @ uv, p / diagQ])
+
+    pc = LinearOperator(Kint.shape, precondition, dtype=Q.dtype)
+
+    iterations_picard = 0
     while True:  # Picard
         uvp = fem.solve(
             *fem.condense(
@@ -105,7 +100,9 @@ while True:  # time-stepping
             break
         u = u_new
     change = np.linalg.norm(u - u_old)
-    logging.info(f"t = {t}, {iterations_picard} Picard iterations, ||Delta u|| = {change}")
+    logging.info(
+        f"t = {t}, {iterations_picard} Picard iterations, ||Delta u|| = {change}"
+    )
 
     if change < tol_steady:
         break
@@ -121,6 +118,9 @@ logging.info("Computed streamfunction.")
 ax = draw(mesh)
 plot(basis["p"], uvp[-basis["p"].N :], ax=ax)
 ax.quiver(*mesh.p, *uvp[basis["u"].nodal_dofs])
-ax.tricontour(Triangulation(*mesh.p, mesh.to_meshtri().t.T), psi[basis["psi"].nodal_dofs.flatten()])
+ax.tricontour(
+    Triangulation(*mesh.p, mesh.to_meshtri().t.T),
+    psi[basis["psi"].nodal_dofs.flatten()],
+)
 savefig(Path(__file__).with_suffix(".png"))
 logging.info("Plotted pressure, velocity, and stream-lines.")
