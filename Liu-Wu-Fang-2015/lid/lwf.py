@@ -39,7 +39,7 @@ mesh.define_boundary(
 )
 logging.info(f"mesh: {mesh}")
 
-element = {"u": fem.ElementVectorH1(fem.ElementQuad2()), "p": fem.ElementQuad0()}
+element = {"u": fem.ElementVectorH1(fem.ElementQuad2()), "p": fem.ElementQuad1()}
 basis = {v: fem.InteriorBasis(mesh, e, intorder=3) for v, e in element.items()}
 logging.info(f"basis: {({v: b.N for v, b in basis.items()})}")
 
