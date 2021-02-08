@@ -74,17 +74,17 @@ while True:  # time-stepping
     u = u_old = uvp[: basis["u"].N]
     f = np.concatenate([M @ u_old / dt, np.zeros(basis["p"].N)])
 
-    K0 = bmat([[velocity_matrix(u), B.T], [B, 1e-6 * Q]], "csc")
-    Kint = fem.condense(K0, D=D, expand=False)
-    Aint = Kint[: -basis["p"].N, : -basis["p"].N]
-    Alu = spilu(Aint)
-    Apc = LinearOperator(Aint.shape, Alu.solve, dtype=M.dtype)
+    Aint = fem.condense(velocity_matrix(u), D=D, expand=False)
+    A_ilu = spilu(Aint)
+    Apc = LinearOperator(Aint.shape, A_ilu.solve, dtype=M.dtype)
 
     def precondition(uvp: np.ndarray) -> np.ndarray:
         uv, p = np.split(uvp, Aint.shape[:1])
         return np.concatenate([Apc @ uv, p / diagQ])
 
-    pc = LinearOperator(Kint.shape, precondition, dtype=Q.dtype)
+    pc = LinearOperator(
+        (Aint.shape[0] + basis["p"].N,) * 2, precondition, dtype=Apc.dtype
+    )
 
     iterations_picard = 0
     while True:  # Picard
